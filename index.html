@@ -64,6 +64,19 @@
   .meta b{display:block;font-size:17px;letter-spacing:0;color:var(--ink);font-weight:700;text-transform:none}
 
   /* ---------- message ---------- */
+  .modes{
+    display:flex;gap:3px;padding:3px;margin:10px 0 0;
+    background:#D6DBE4;border-radius:7px;
+  }
+  .mode{
+    border:0;background:transparent;cursor:pointer;
+    padding:8px 15px;border-radius:5px;
+    font-family:inherit;font-size:11px;font-weight:700;
+    letter-spacing:.1em;text-transform:uppercase;
+    color:var(--ink-soft);
+    transition:background .14s ease,color .14s ease;
+  }
+  .mode.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(23,32,46,.18)}
   .notice{
     height:30px;
     display:flex;align-items:center;justify-content:center;
@@ -170,6 +183,18 @@
     background:var(--ink);color:var(--card);
   }
   .btn.ghost{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 2px var(--line)}
+  .countdown{
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);
+    font-variant-numeric:tabular-nums;margin:-6px 0 16px;
+  }
+  .countdown[hidden]{display:none}
+  .countdown b{font-size:15px;letter-spacing:.02em;color:var(--ink);font-weight:700}
+  .link{
+    display:block;margin:14px auto 0;background:none;border:0;cursor:pointer;
+    font-family:inherit;font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-soft);text-decoration:underline;text-underline-offset:3px;
+  }
+  .link[hidden]{display:none}
 
   @media (max-height:720px){:root{--tile:54px} .key{height:48px}}
   @media (max-height:620px){:root{--tile:46px} .key{height:42px} .wordmark{font-size:22px}}
@@ -184,11 +209,16 @@
 <header>
   <h1 class="wordmark">Five<span class="x">×</span>Six</h1>
   <div class="meta">
-    <div>Round<b id="statRound">1</b></div>
+    <div id="lblLeft">Puzzle<b id="statRound">1</b></div>
     <div>Won<b id="statWon">0</b></div>
     <div>Streak<b id="statStreak">0</b></div>
   </div>
 </header>
+
+<div class="modes" role="group" aria-label="Game mode">
+  <button type="button" class="mode on" id="modeDaily">Today's word</button>
+  <button type="button" class="mode" id="modeRandom">Random</button>
+</div>
 
 <div class="notice"><span id="notice" role="status" aria-live="polite"></span></div>
 
@@ -203,10 +233,12 @@
     <h2 id="endTitle">Solved</h2>
     <p id="endLine">The word was <span class="answer" id="endWord"></span></p>
     <div class="proof" id="proof"></div>
+    <div class="countdown" id="countdown"></div>
     <div class="btns">
       <button class="btn ghost" id="copyBtn">Copy result</button>
-      <button class="btn" id="againBtn">New word</button>
+      <button class="btn" id="againBtn">Random word</button>
     </div>
+    <button class="link" id="dailyBtn" hidden>Back to today's word</button>
   </div>
 </div>
 
@@ -227,12 +259,59 @@ WORDS.forEach(function(w){ DICT[w] = true; });
 VALID.split(" ").forEach(function(w){ DICT[w] = true; });
 VALID = null;
 
+/* ---------------- the daily word ---------------- */
+/* Everyone who loads the page on the same calendar day gets the same word.
+   No server needed — the word is derived from the date itself. */
+
+var EPOCH = Date.UTC(2026, 0, 1);          /* puzzle #0 = 1 Jan 2026 */
+
+function dayNumber(){
+  var d = new Date();
+  var local = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  return Math.floor((local - EPOCH) / 86400000);
+}
+
+/* Fixed-seed shuffle, so day 41 and day 42 aren't alphabetical neighbours.
+   Same seed everywhere = same order everywhere. */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+var ORDER = WORDS.slice();
+(function(){
+  var rnd = mulberry32(20260101);
+  for (var i = ORDER.length - 1; i > 0; i--){
+    var j = Math.floor(rnd() * (i + 1));
+    var tmp = ORDER[i]; ORDER[i] = ORDER[j]; ORDER[j] = tmp;
+  }
+})();
+function wordForDay(n){
+  return ORDER[((n % ORDER.length) + ORDER.length) % ORDER.length];
+}
+
+/* ---------------- saved progress ---------------- */
+var KEY = "fivexsix";
+function load(){
+  try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){ return {}; }
+}
+function save(obj){
+  try { localStorage.setItem(KEY, JSON.stringify(obj)); } catch(e){}
+}
+var saved = load();
+var stats = saved.stats || { played: 0, won: 0, streak: 0, last: null };
+
 /* ---------------- state ---------------- */
 var ROWS = 6, COLS = 5;
-var answer = "", row = 0, guess = "", done = false, busy = false;
-var override = null;          // guess awaiting a second Enter to be used anyway
-var results = [];             // scored rows, for the result strip
-var round = 1, won = 0, streak = 0;
+var mode = "daily";
+var puzzleNo = dayNumber();
+var answer = "", row = 0, guess = "", done = false, busy = false, restoring = false;
+var override = null;          /* guess awaiting a second Enter to be used anyway */
+var results = [];             /* scored rows, for the result strip */
+var plays = [];               /* the words guessed, for saving */
 
 var boardEl = document.getElementById("board");
 var kbEl = document.getElementById("keyboard");
@@ -357,11 +436,13 @@ function reveal(word){
   busy = true;
   var marks = score(word, answer);
   results.push(marks);
+  plays.push(word);
   var cells = tiles[row].cells;
-  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var reduced = restoring || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var step = reduced ? 0 : 260;
 
   marks.forEach(function(m, i){
+    cells[i].textContent = word[i];
     setTimeout(function(){
       cells[i].classList.add("flip");
       setTimeout(function(){
@@ -371,17 +452,21 @@ function reveal(word){
     }, i * step);
   });
 
-  setTimeout(function(){
+  var wrap = function(){
     marks.forEach(function(m, i){ markKey(word[i], m); });
     finishRow(word);
-  }, marks.length * step + (reduced ? 0 : 320));
+  };
+  if (reduced) wrap();
+  else setTimeout(wrap, marks.length * step + 320);
 }
 
 var RANK = { gone: 1, near: 2, right: 3 };
 function markKey(ch, mark){
   var el = keyEls[ch];
   if (!el) return;
-  var cur = el.classList.contains("right") ? "right" : el.classList.contains("near") ? "near" : el.classList.contains("gone") ? "gone" : null;
+  var cur = el.classList.contains("right") ? "right"
+          : el.classList.contains("near") ? "near"
+          : el.classList.contains("gone") ? "gone" : null;
   if (cur && RANK[cur] >= RANK[mark]) return;
   el.classList.remove("right", "near", "gone");
   el.classList.add(mark);
@@ -393,31 +478,82 @@ function finishRow(word){
   guess = "";
   busy = false;
 
-  if (solved){
-    tiles[row - 1].el.classList.add("cheer");
-    won++; streak++;
-    updateStats();
-    setTimeout(function(){ endGame(true); }, 600);
-  } else if (row >= ROWS){
-    streak = 0;
-    updateStats();
-    setTimeout(function(){ endGame(false); }, 300);
+  if (mode === "daily") saveGame();
+
+  if (solved || row >= ROWS){
+    done = true;
+    if (restoring) return;                  /* board rebuilt from save — don't re-count */
+    if (mode === "daily") recordResult(solved);
+    if (solved) tiles[row - 1].el.classList.add("cheer");
+    setTimeout(function(){ endGame(solved); }, solved ? 600 : 300);
   }
 }
 
+function recordResult(solved){
+  if (stats.last === puzzleNo) return;      /* already counted today */
+  stats.played++;
+  if (solved){
+    stats.won++;
+    stats.streak = (stats.last === puzzleNo - 1) ? stats.streak + 1 : 1;
+  } else {
+    stats.streak = 0;
+  }
+  stats.last = puzzleNo;
+  saveGame();
+  updateStats();
+}
+
+function saveGame(){
+  save({ day: puzzleNo, guesses: plays, stats: stats });
+}
+
+function syncModes(){
+  document.getElementById("modeDaily").classList.toggle("on", mode === "daily");
+  document.getElementById("modeRandom").classList.toggle("on", mode !== "daily");
+}
+document.getElementById("modeDaily").addEventListener("click", function(){
+  if (mode !== "daily") startGame("daily");
+  this.blur();
+});
+document.getElementById("modeRandom").addEventListener("click", function(){
+  startGame("practice");   /* tapping Random again deals a fresh word */
+  this.blur();
+});
+
 function updateStats(){
-  document.getElementById("statRound").textContent = round;
-  document.getElementById("statWon").textContent = won;
-  document.getElementById("statStreak").textContent = streak;
+  syncModes();
+  document.getElementById("lblLeft").firstChild.nodeValue = (mode === "daily") ? "Puzzle" : "Random";
+  document.getElementById("statRound").textContent = (mode === "daily") ? puzzleNo : "—";
+  document.getElementById("statWon").textContent = stats.won;
+  document.getElementById("statStreak").textContent = stats.streak;
 }
 
 /* ---------------- end card ---------------- */
 var PRAISE = ["Sharp.", "Nicely done.", "Two to spare.", "Comfortable.", "Down to the wire.", "That was close."];
+var tick = null;
+
+function pad(n){ return (n < 10 ? "0" : "") + n; }
+function startCountdown(){
+  var el = document.getElementById("countdown");
+  if (mode !== "daily"){ el.hidden = true; return; }
+  el.hidden = false;
+  function draw(){
+    var now = new Date();
+    var next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    var s = Math.max(0, Math.floor((next - now) / 1000));
+    el.innerHTML = "Next word in <b>" + pad(Math.floor(s / 3600)) + ":" + pad(Math.floor(s / 60) % 60) + ":" + pad(s % 60) + "</b>";
+  }
+  draw();
+  clearInterval(tick);
+  tick = setInterval(draw, 1000);
+}
+
 function endGame(solved){
-  done = true;
-  document.getElementById("endTitle").textContent = solved ? PRAISE[Math.min(row - 1, PRAISE.length - 1)] : "Out of guesses";
+  document.getElementById("endTitle").textContent = solved
+    ? PRAISE[Math.min(results.length - 1, PRAISE.length - 1)]
+    : "Out of guesses";
   document.getElementById("endLine").innerHTML = solved
-    ? "Solved in " + row + (row === 1 ? " guess" : " guesses")
+    ? "Solved in " + results.length + (results.length === 1 ? " guess" : " guesses")
     : 'The word was <span class="answer">' + answer + "</span>";
 
   var proof = document.getElementById("proof");
@@ -433,20 +569,23 @@ function endGame(solved){
     proof.appendChild(pr);
   });
 
+  document.getElementById("againBtn").textContent = (mode === "daily") ? "Random word" : "Another random";
+  document.getElementById("dailyBtn").hidden = (mode === "daily");
+  startCountdown();
   veil.classList.add("on");
   document.getElementById("againBtn").focus();
 }
 
-document.getElementById("againBtn").addEventListener("click", function(){ round++; newGame(); });
 document.getElementById("copyBtn").addEventListener("click", function(){
   var glyph = { right: "🟩", near: "🟨", gone: "⬜" };
-  var text = "Five×Six " + (results[results.length - 1].every(function(m){ return m === "right"; }) ? results.length : "X") + "/6\n"
-    + results.map(function(r){ return r.map(function(m){ return glyph[m]; }).join(""); }).join("\n");
+  var solved = results.length && results[results.length - 1].every(function(m){ return m === "right"; });
+  var head = (mode === "daily" ? "Five×Six #" + puzzleNo + " " : "Five×Six ") + (solved ? results.length : "X") + "/6";
+  var text = head + "\n" + results.map(function(r){
+    return r.map(function(m){ return glyph[m]; }).join("");
+  }).join("\n") + "\n" + location.href;
+
   var btn = this;
   function ok(){ btn.textContent = "Copied"; setTimeout(function(){ btn.textContent = "Copy result"; }, 1400); }
-  if (navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).then(ok, fallback);
-  } else fallback();
   function fallback(){
     var ta = document.createElement("textarea");
     ta.value = text;
@@ -457,29 +596,56 @@ document.getElementById("copyBtn").addEventListener("click", function(){
     try { document.execCommand("copy"); ok(); } catch(e){ btn.textContent = "Press ⌘C"; }
     document.body.removeChild(ta);
   }
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, fallback);
+  else fallback();
 });
 
+document.getElementById("againBtn").addEventListener("click", function(){
+  startGame(mode === "daily" ? "practice" : "practice");
+});
+document.getElementById("dailyBtn").addEventListener("click", function(){ startGame("daily"); });
+
 /* ---------------- lifecycle ---------------- */
-function newGame(){
-  answer = WORDS[Math.floor(Math.random() * WORDS.length)];
-  row = 0; guess = ""; done = false; busy = false; override = null; results = [];
+function resetBoard(){
   tiles.forEach(function(t){
     t.el.classList.remove("shake", "cheer");
-    t.cells.forEach(function(c){
-      c.className = "tile";
-      c.textContent = "";
-    });
+    t.cells.forEach(function(c){ c.className = "tile"; c.textContent = ""; });
   });
   Object.keys(keyEls).forEach(function(k){ keyEls[k].classList.remove("right", "near", "gone"); });
+}
+
+function startGame(which){
+  mode = which;
+  puzzleNo = dayNumber();
+  answer = (mode === "daily") ? wordForDay(puzzleNo) : WORDS[Math.floor(Math.random() * WORDS.length)];
+  row = 0; guess = ""; done = false; busy = false; override = null;
+  results = []; plays = [];
+  resetBoard();
   veil.classList.remove("on");
   noticeEl.classList.remove("on");
+  clearInterval(tick);
   updateStats();
+
+  if (mode === "daily"){
+    var s = load();
+    if (s.day === puzzleNo && s.guesses && s.guesses.length){
+      restoring = true;
+      s.guesses.forEach(function(w){ if (!done) reveal(w); });
+      restoring = false;
+      if (done){ endGame(plays[plays.length - 1] === answer); return; }
+      say("Puzzle #" + puzzleNo + " — picking up where you left off.", 2600);
+      return;
+    }
+    say("Puzzle #" + puzzleNo + " — everyone gets this word today.", 3000);
+  } else {
+    say("Random word — this one doesn't count towards your streak.", 2600);
+  }
 }
 
 document.addEventListener("keydown", function(e){
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (veil.classList.contains("on")){
-    if (e.key === "Enter"){ e.preventDefault(); round++; newGame(); }
+    if (e.key === "Escape"){ veil.classList.remove("on"); clearInterval(tick); }
     return;
   }
   if (e.key === "Enter"){ e.preventDefault(); submit(); }
@@ -487,8 +653,12 @@ document.addEventListener("keydown", function(e){
   else if (/^[a-zA-Z]$/.test(e.key)) typeLetter(e.key.toLowerCase());
 });
 
-newGame();
-say("Guess the five-letter word.", 2600);
+/* if the tab is left open past midnight, roll over to the new word */
+setInterval(function(){
+  if (mode === "daily" && dayNumber() !== puzzleNo) startGame("daily");
+}, 30000);
+
+startGame("daily");
 })();
 </script>
 </body>
