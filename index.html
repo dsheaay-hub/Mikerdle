@@ -17,15 +17,20 @@
     --right:#0E7C6B;
     --near:#C98A1B;
     --gone:#79828F;
-    --tile:64px;
-    --gap:7px;
+    --tile:56px;
+    --key:52px;
+    --gap:6px;
+    /* browsers with svh support get fully fluid sizing; older ones keep the px above */
+    --tile:max(34px, min(64px, (100vw - 64px)/5, (100svh - 400px)/6));
+    --key:clamp(38px, 7.4svh, 56px);
   }
   *{box-sizing:border-box}
   html{height:100%}
   body{
     margin:0;
     height:100vh;
-    height:100dvh;   /* dvh excludes Safari's floating toolbar; vh does not */
+    height:100svh;   /* svh = viewport with Safari's toolbars showing */
+    touch-action:manipulation;   /* no double-tap-to-zoom on fast repeat taps */
     background:var(--paper);
     color:var(--ink);
     font-family:"Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
@@ -67,11 +72,11 @@
 
   /* ---------- message ---------- */
   .modes{
-    display:flex;gap:3px;padding:3px;margin:10px 0 0;
+    display:flex;gap:3px;padding:3px;margin:8px 0 0;
     background:#D6DBE4;border-radius:7px;
   }
   .mode{
-    border:0;background:transparent;cursor:pointer;
+    border:0;background:transparent;cursor:pointer;touch-action:manipulation;
     padding:8px 15px;border-radius:5px;
     font-family:inherit;font-size:11px;font-weight:700;
     letter-spacing:.1em;text-transform:uppercase;
@@ -80,7 +85,7 @@
   }
   .mode.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(23,32,46,.18)}
   .notice{
-    height:30px;
+    height:26px;
     display:flex;align-items:center;justify-content:center;
     width:100%;
   }
@@ -127,12 +132,12 @@
   @keyframes cheer{0%{transform:translateY(0)}40%{transform:translateY(-13px)}100%{transform:translateY(0)}}
 
   /* ---------- keyboard ---------- */
-  #keyboard{width:100%;max-width:520px;display:flex;flex-direction:column;gap:7px;margin-top:14px}
+  #keyboard{width:100%;max-width:520px;display:flex;flex-direction:column;gap:6px;margin-top:10px}
   .krow{display:flex;gap:5px;justify-content:center}
   .key{
     flex:1 1 0;
     min-width:0;
-    height:56px;
+    height:var(--key);
     border:0;
     border-radius:5px;
     background:#CFD5DE;
@@ -142,6 +147,7 @@
     text-transform:uppercase;
     letter-spacing:.02em;
     cursor:pointer;
+    touch-action:manipulation;
     box-shadow:inset 0 -3px 0 rgba(23,32,46,.14);
     transition:background .12s ease,color .12s ease,transform .06s ease;
   }
@@ -199,9 +205,8 @@
   .link[hidden]{display:none}
 
   #keyboard{padding-bottom:2px}
-  @media (max-height:720px){:root{--tile:54px} .key{height:48px}}
-  @media (max-height:620px){:root{--tile:46px} .key{height:42px} .wordmark{font-size:22px}}
-  @media (max-width:380px){:root{--tile:56px;--gap:5px}}
+  @media (max-height:680px){.wordmark{font-size:22px}}
+  @media (max-width:380px){:root{--gap:5px}}
   @media (prefers-reduced-motion:reduce){
     *{animation:none !important;transition:none !important}
   }
