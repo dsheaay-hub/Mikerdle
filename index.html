@@ -247,7 +247,7 @@
 </main>
 
 <div id="keyboard"></div>
-<div class="build" id="build">v1.5</div>
+<div class="build" id="build">v1.6</div>
 
 <div class="veil" id="nameVeil">
   <div class="card" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
@@ -256,7 +256,7 @@
     <input id="nameInput" class="field" maxlength="18" autocomplete="given-name"
            autocapitalize="words" spellcheck="false" placeholder="First name">
     <div class="btns"><button class="btn" id="nameSave">Start playing</button></div>
-    <div class="build" style="margin-top:12px">v1.5</div>
+    <div class="build" style="margin-top:12px">v1.6</div>
   </div>
 </div>
 
@@ -284,7 +284,7 @@
    Leave it as "" and the game still works, it just won't log anything.
    ===================================================================== */
 var SHEET_URL = "https://script.google.com/macros/s/AKfycby9LSgWuF5kI_YvwVREjeelv-cYarIznzGh5NTJ1j3vw-Ux4JnZE-ajRD5nnvgISqC-Aw/exec";
-var APP_VERSION = "1.5";
+var APP_VERSION = "1.6";
 
 
 /* ---------------- words ---------------- */
@@ -566,8 +566,7 @@ function syncModes(){
   document.getElementById("modeRandom").classList.toggle("on", mode !== "daily");
 }
 document.getElementById("modeDaily").addEventListener("click", function(){
-  if (mode !== "daily") askName();
-startGame("daily");
+  if (mode !== "daily") startGame("daily");
   this.blur();
 });
 document.getElementById("modeRandom").addEventListener("click", function(){
@@ -804,6 +803,7 @@ setInterval(function(){
   if (mode === "daily" && dayNumber() !== puzzleNo) startGame("daily");
 }, 30000);
 
+askName();
 startGame("daily");
 })();
 </script>
