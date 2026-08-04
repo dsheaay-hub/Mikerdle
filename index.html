@@ -166,6 +166,7 @@
     opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:5;
   }
   .veil.on{opacity:1;pointer-events:auto}
+  #nameVeil{z-index:9}
   .card{
     background:var(--card);border-radius:8px;padding:26px 24px 22px;
     width:100%;max-width:340px;text-align:center;
@@ -559,8 +560,8 @@ function syncModes(){
   document.getElementById("modeRandom").classList.toggle("on", mode !== "daily");
 }
 document.getElementById("modeDaily").addEventListener("click", function(){
-  if (mode !== "daily") startGame("daily");
-askName();
+  if (mode !== "daily") askName();
+startGame("daily");
   this.blur();
 });
 document.getElementById("modeRandom").addEventListener("click", function(){
@@ -596,7 +597,9 @@ function startCountdown(){
   tick = setInterval(draw, 1000);
 }
 
+var pendingEnd = null;
 function endGame(solved){
+  if (nameVeil.classList.contains("on")){ pendingEnd = solved; return; }
   document.getElementById("endTitle").textContent = solved
     ? PRAISE[Math.min(results.length - 1, PRAISE.length - 1)]
     : "Out of guesses";
@@ -722,8 +725,13 @@ function saveName(){
   player = v;
   writeLS("fivexsix.name", player);
   nameVeil.classList.remove("on");
-  veil.classList.remove("on");
-  /* clock starts when they actually get to the board */
+
+  if (pendingEnd !== null){          /* today's board was already finished */
+    var s = pendingEnd; pendingEnd = null;
+    endGame(s);
+    return;
+  }
+  /* clock starts when they actually reach the board */
   if (!firstKeyAt) openedAt = new Date();
   say((mode === "daily")
       ? "Good luck, " + player + " — puzzle #" + puzzleNo + "."
