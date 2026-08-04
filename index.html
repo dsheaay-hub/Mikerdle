@@ -173,13 +173,6 @@
     transform:translateY(10px);transition:transform .22s ease;
   }
   .veil.on .card{transform:none}
-  .brand{display:flex;flex-direction:column;gap:3px}
-  .who{
-    background:none;border:0;padding:0;cursor:pointer;text-align:left;
-    font-family:inherit;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
-    color:var(--ink-soft);text-decoration:underline;text-underline-offset:3px;
-    touch-action:manipulation;
-  }
   .field{
     width:100%;padding:13px 14px;margin:0 0 16px;
     border:2px solid var(--line);border-radius:5px;background:#fff;
@@ -229,10 +222,7 @@
 <body>
 
 <header>
-  <div class="brand">
-    <h1 class="wordmark">Five<span class="x">×</span>Six</h1>
-    <button type="button" class="who" id="whoBtn">not signed in</button>
-  </div>
+  <h1 class="wordmark">Five<span class="x">×</span>Six</h1>
   <div class="meta">
     <div id="lblLeft">Puzzle<b id="statRound">1</b></div>
     <div>Won<b id="statWon">0</b></div>
@@ -274,6 +264,7 @@
       <button class="btn" id="againBtn">Random word</button>
     </div>
     <button class="link" id="dailyBtn" hidden>Back to today's word</button>
+    <button class="link" id="switchBtn">Switch player</button>
   </div>
 </div>
 
@@ -568,9 +559,8 @@ function syncModes(){
   document.getElementById("modeRandom").classList.toggle("on", mode !== "daily");
 }
 document.getElementById("modeDaily").addEventListener("click", function(){
-  if (mode !== "daily") showWho();
-startGame("daily");
-if (!player) askName();
+  if (mode !== "daily") startGame("daily");
+askName();
   this.blur();
 });
 document.getElementById("modeRandom").addEventListener("click", function(){
@@ -721,9 +711,6 @@ function logResult(solved){
 var nameVeil = document.getElementById("nameVeil");
 var nameInput = document.getElementById("nameInput");
 
-function showWho(){
-  document.getElementById("whoBtn").textContent = player ? (player + "  \u270e") : "not signed in";
-}
 function askName(){
   nameInput.value = player || "";
   nameVeil.classList.add("on");
@@ -734,15 +721,20 @@ function saveName(){
   if (!v){ nameInput.focus(); return; }
   player = v;
   writeLS("fivexsix.name", player);
-  showWho();
   nameVeil.classList.remove("on");
+  veil.classList.remove("on");
+  /* clock starts when they actually get to the board */
+  if (!firstKeyAt) openedAt = new Date();
+  say((mode === "daily")
+      ? "Good luck, " + player + " — puzzle #" + puzzleNo + "."
+      : "Good luck, " + player + " — random word.", 2600);
 }
 document.getElementById("nameSave").addEventListener("click", saveName);
 nameInput.addEventListener("keydown", function(e){
   if (e.key === "Enter"){ e.preventDefault(); saveName(); }
   e.stopPropagation();
 });
-document.getElementById("whoBtn").addEventListener("click", askName);
+document.getElementById("switchBtn").addEventListener("click", askName);
 
 /* ---------------- lifecycle ---------------- */
 function resetBoard(){
@@ -773,7 +765,6 @@ function startGame(which){
       s.guesses.forEach(function(w){ if (!done) reveal(w); });
       restoring = false;
       if (done){ endGame(plays[plays.length - 1] === answer); return; }
-      say("Puzzle #" + puzzleNo + " — picking up where you left off.", 2600);
       return;
     }
     say("Puzzle #" + puzzleNo + " — everyone gets this word today.", 3000);
@@ -784,6 +775,7 @@ function startGame(which){
 
 document.addEventListener("keydown", function(e){
   if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (nameVeil.classList.contains("on")) return;   /* name first */
   if (veil.classList.contains("on")){
     if (e.key === "Escape"){ veil.classList.remove("on"); clearInterval(tick); }
     return;
