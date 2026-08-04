@@ -84,6 +84,10 @@
     transition:background .14s ease,color .14s ease;
   }
   .mode.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(23,32,46,.18)}
+  .build{
+    font-size:9px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--ink-soft);opacity:.5;margin-top:6px;
+  }
   .notice{
     height:26px;
     display:flex;align-items:center;justify-content:center;
@@ -243,6 +247,7 @@
 </main>
 
 <div id="keyboard"></div>
+<div class="build" id="build">v1.5</div>
 
 <div class="veil" id="nameVeil">
   <div class="card" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
@@ -251,6 +256,7 @@
     <input id="nameInput" class="field" maxlength="18" autocomplete="given-name"
            autocapitalize="words" spellcheck="false" placeholder="First name">
     <div class="btns"><button class="btn" id="nameSave">Start playing</button></div>
+    <div class="build" style="margin-top:12px">v1.5</div>
   </div>
 </div>
 
@@ -278,7 +284,7 @@
    Leave it as "" and the game still works, it just won't log anything.
    ===================================================================== */
 var SHEET_URL = "https://script.google.com/macros/s/AKfycby9LSgWuF5kI_YvwVREjeelv-cYarIznzGh5NTJ1j3vw-Ux4JnZE-ajRD5nnvgISqC-Aw/exec";
-var APP_VERSION = "1.4";
+var APP_VERSION = "1.5";
 
 
 /* ---------------- words ---------------- */
