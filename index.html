@@ -173,6 +173,20 @@
     transform:translateY(10px);transition:transform .22s ease;
   }
   .veil.on .card{transform:none}
+  .brand{display:flex;flex-direction:column;gap:3px}
+  .who{
+    background:none;border:0;padding:0;cursor:pointer;text-align:left;
+    font-family:inherit;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--ink-soft);text-decoration:underline;text-underline-offset:3px;
+    touch-action:manipulation;
+  }
+  .field{
+    width:100%;padding:13px 14px;margin:0 0 16px;
+    border:2px solid var(--line);border-radius:5px;background:#fff;
+    font-family:inherit;font-size:17px;font-weight:500;color:var(--ink);
+    text-align:center;
+  }
+  .field:focus{outline:none;border-color:var(--ink)}
   .card h2{font-family:"Fraunces",Georgia,serif;font-weight:900;font-size:28px;margin:0 0 4px;letter-spacing:-.02em}
   .card p{margin:0 0 16px;color:var(--ink-soft);font-size:14px}
   .card .answer{
@@ -215,7 +229,10 @@
 <body>
 
 <header>
-  <h1 class="wordmark">Five<span class="x">×</span>Six</h1>
+  <div class="brand">
+    <h1 class="wordmark">Five<span class="x">×</span>Six</h1>
+    <button type="button" class="who" id="whoBtn">not signed in</button>
+  </div>
   <div class="meta">
     <div id="lblLeft">Puzzle<b id="statRound">1</b></div>
     <div>Won<b id="statWon">0</b></div>
@@ -236,6 +253,16 @@
 
 <div id="keyboard"></div>
 
+<div class="veil" id="nameVeil">
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
+    <h2 id="nameTitle">Who's playing?</h2>
+    <p>Your first name goes on the scoreboard so everyone can compare.</p>
+    <input id="nameInput" class="field" maxlength="18" autocomplete="given-name"
+           autocapitalize="words" spellcheck="false" placeholder="First name">
+    <div class="btns"><button class="btn" id="nameSave">Start playing</button></div>
+  </div>
+</div>
+
 <div class="veil" id="veil">
   <div class="card" role="dialog" aria-modal="true" aria-labelledby="endTitle">
     <h2 id="endTitle">Solved</h2>
@@ -253,6 +280,14 @@
 <script>
 (function(){
 "use strict";
+
+/* =====================================================================
+   SCOREBOARD SETUP — paste your Google Apps Script web-app URL here.
+   Leave it as "" and the game still works, it just won't log anything.
+   ===================================================================== */
+var SHEET_URL = "";
+var APP_VERSION = "1.4";
+
 
 /* ---------------- words ---------------- */
 var WORDS = ("about above actor acute adapt admit adopt adult after again agent agree ahead alarm album alert alike alive allow alone along alter amber amend among ample anger angle angry ankle apart apple apply arena argue arise armor aroma array arrow aside asset audio audit avoid awake award aware badge badly baker basic basil batch beach beard beast began begin being belly below bench berry birth black blade blame blank blast blaze bleak blend bless blind block blood bloom board boast bonus boost booth bound brain brake brand brass brave bread break breed brick bride brief bring brisk broad broke brown brush build built bunch burnt burst cabin cable camel canal candy cargo carve catch cause cease chain chair chalk charm chart chase cheap check cheek cheer chess chest chief child chill chose chunk cider cigar civic civil claim clamp clash class clean clear clerk click cliff climb cling clock close cloth cloud clown coach coast cocoa colon color comet comic coral couch could count court cover crack craft crane crash crawl crazy cream creek crept crest crime crisp cross crowd crown crude cruel crush crust curly curve cycle daily dairy dance dealt debut decay decor delay delta dense depth derby devil diary dirty ditch diver dizzy dodge doing donor doubt dough dozen draft drain drama drank dream dress dried drift drill drink drive drove drown dryer eager eagle early earth eight elbow elder elect elite empty enemy enjoy enter entry equal equip error essay event every exact exile exist extra fable faint fairy faith false fancy fatal fault favor feast fence ferry fetch fever fiber field fiery fifty fight final first flame flash fleet flesh flick fling float flock flood floor flour fluid flush focal focus force forge forty forum found frame fraud fresh fried front frost fruit fudge fully funny gauge ghost giant given glass gleam globe glory glove going grace grade grain grand grant grape graph grasp grass grave great greed green greet grief grill grind groan group grove growl guard guess guest guide guilt habit handy happy harsh haste hatch haunt heart heavy hedge hello hence hobby honey honor horse hotel house hover human humid humor hurry ideal image imply index inner input irony issue ivory jelly jewel joint jolly judge juice jumbo karma kneel knife knock known label labor large larva laser later laugh layer learn lease leash leave legal lemon level lever light limit linen liver lobby local lodge logic loose lover lower loyal lucky lunar lunch lyric magic major maker mango manor maple march marsh match mayor meant medal media mercy merge merit merry metal meter midst might mimic minor minus mixed model moist money month moral motor mount mouse mouth movie music naked nasty naval needy nerve never newly night noble noise north novel nurse ocean offer often olive onion opera orbit order organ other ought ounce outer owner oxide ozone paint panel panic paper party pasta paste patch pause peace peach pearl pedal penny perch phase phone photo piano piece pilot pinch pitch pivot pixel pizza place plain plane plank plant plate plaza plead pluck plumb plush point polar porch pound power press price pride prime print prior prize probe prone proof proud prove prune pulse punch pupil puppy purse quart queen query quest queue quick quiet quilt quite quota quote radar radio raise rally ranch range rapid ratio razor reach react ready realm rebel refer reign relax relay renew repay reply rider ridge rifle right rigid rinse risky rival river roast robin robot rocky rogue rough round route royal rugby ruler rumor rural sadly saint salad salon sauce scale scarf scene scent scope score scout scrap screw seize sense serve seven shade shaft shake shall shame shape share shark sharp shave sheep sheer sheet shelf shell shift shine shiny shirt shock shoot shore short shout shown shrub sight silly since siren sixth skate skill skirt slate sleek sleep slice slide slope small smart smash smell smile smoke snack snake sneak solar solid solve sorry sound south space spade spare spark speak spear speed spell spend spice spicy spike spine spite split spoke spoon sport spray squad stack staff stage stain stair stake stall stamp stand stare start state steak steal steam steel steep steer stern stick stiff still sting stock stone stool store storm story stove strap straw strip stuck study stuff stump style sugar suite sunny super surge swamp swarm swear sweat sweep sweet swept swift swing sword table tempo tenor tense tenth thank theme there these thick thief thigh thing think third thorn those three throw thumb tiger tight timer tired title toast today token tonic tooth topic torch total touch tough tower toxic trace track trade trail train trait trash treat trend trial tribe trick tried troop trout truck truly trunk trust truth tulip tumor tutor twice twist uncle under union unite unity until upper upset urban usage usual vague valid value vapor vault venue verse video vigor villa vinyl viral virus visit vital vivid vocal voice voter wagon waist waste watch water weary weave wedge weigh weird whale wheat wheel where which while white whole whose widow width windy witty woman world worry worse worst worth would wound wrist write wrong yacht yeast yield young youth zebra")
@@ -309,6 +344,16 @@ function load(){
 function save(obj){
   try { localStorage.setItem(KEY, JSON.stringify(obj)); } catch(e){}
 }
+function readLS(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+function writeLS(k, v){ try { localStorage.setItem(k, v); } catch(e){} }
+
+var player = readLS("fivexsix.name") || "";
+var playerId = readLS("fivexsix.id");
+if (!playerId){
+  playerId = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  writeLS("fivexsix.id", playerId);
+}
+
 var saved = load();
 var stats = saved.stats || { played: 0, won: 0, streak: 0, last: null };
 
@@ -319,6 +364,7 @@ var puzzleNo = dayNumber();
 var answer = "", row = 0, guess = "", done = false, busy = false, restoring = false;
 var override = null;          /* guess awaiting a second Enter to be used anyway */
 var results = [];             /* scored rows, for the result strip */
+var openedAt = null, firstKeyAt = null;   /* timing, for the scoreboard */
 var plays = [];               /* the words guessed, for saving */
 
 var boardEl = document.getElementById("board");
@@ -412,6 +458,7 @@ function paintRow(){
 /* ---------------- input ---------------- */
 function typeLetter(ch){
   if (done || busy || guess.length >= COLS) return;
+  if (!firstKeyAt) firstKeyAt = new Date();
   guess += ch;
   override = null;
   paintRow();
@@ -492,6 +539,7 @@ function finishRow(word){
     done = true;
     if (restoring) return;                  /* board rebuilt from save — don't re-count */
     if (mode === "daily") recordResult(solved);
+    logResult(solved);
     if (solved) tiles[row - 1].el.classList.add("cheer");
     setTimeout(function(){ endGame(solved); }, solved ? 600 : 300);
   }
@@ -520,7 +568,9 @@ function syncModes(){
   document.getElementById("modeRandom").classList.toggle("on", mode !== "daily");
 }
 document.getElementById("modeDaily").addEventListener("click", function(){
-  if (mode !== "daily") startGame("daily");
+  if (mode !== "daily") showWho();
+startGame("daily");
+if (!player) askName();
   this.blur();
 });
 document.getElementById("modeRandom").addEventListener("click", function(){
@@ -613,6 +663,87 @@ document.getElementById("againBtn").addEventListener("click", function(){
 });
 document.getElementById("dailyBtn").addEventListener("click", function(){ startGame("daily"); });
 
+/* ---------------- scoreboard ---------------- */
+function two(n){ return (n < 10 ? "0" : "") + n; }
+function clockOf(d){ return d ? two(d.getHours()) + ":" + two(d.getMinutes()) + ":" + two(d.getSeconds()) : ""; }
+function stampOf(d){ return d ? d.getFullYear() + "-" + two(d.getMonth() + 1) + "-" + two(d.getDate()) + " " + clockOf(d) : ""; }
+
+function logResult(solved){
+  if (!SHEET_URL) return;
+  var finishedAt = new Date();
+  var from = firstKeyAt || openedAt || finishedAt;
+  var secs = Math.round((finishedAt - from) / 1000);
+  var glyph = { right: "\ud83d\udfe9", near: "\ud83d\udfe8", gone: "\u2b1c" };
+  var tz = "";
+  try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch(e){}
+
+  var payload = {
+    player:        player || "Anonymous",
+    playerId:      playerId,
+    mode:          (mode === "daily") ? "Today" : "Random",
+    puzzle:        (mode === "daily") ? puzzleNo : "",
+    word:          answer,
+    result:        solved ? "Solved" : "Failed",
+    attempts:      solved ? results.length : "X",
+    guessesUsed:   results.length,
+    seconds:       secs,
+    duration:      Math.floor(secs / 60) + ":" + two(secs % 60),
+    openedAt:      stampOf(openedAt),
+    firstKeyAt:    stampOf(firstKeyAt),
+    finishedAt:    stampOf(finishedAt),
+    secsToFirst:   firstKeyAt && openedAt ? Math.round((firstKeyAt - openedAt) / 1000) : "",
+    guesses:       plays.join(", "),
+    firstGuess:    plays[0] || "",
+    grid:          results.map(function(r){ return r.map(function(m){ return glyph[m]; }).join(""); }).join(" | "),
+    streak:        stats.streak,
+    played:        stats.played,
+    won:           stats.won,
+    winPct:        stats.played ? Math.round(stats.won / stats.played * 100) + "%" : "",
+    timezone:      tz,
+    device:        (/iPhone|iPad|Android|Mobile/i.test(navigator.userAgent) ? "Mobile" : "Desktop"),
+    screen:        (window.innerWidth + "x" + window.innerHeight),
+    version:       APP_VERSION
+  };
+
+  try {
+    /* text/plain + no-cors keeps this a "simple" request, which Apps Script accepts
+       without a preflight. The reply is opaque, so we fire and forget. */
+    fetch(SHEET_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    });
+  } catch(e){}
+}
+
+/* ---------------- name dialog ---------------- */
+var nameVeil = document.getElementById("nameVeil");
+var nameInput = document.getElementById("nameInput");
+
+function showWho(){
+  document.getElementById("whoBtn").textContent = player ? (player + "  \u270e") : "not signed in";
+}
+function askName(){
+  nameInput.value = player || "";
+  nameVeil.classList.add("on");
+  setTimeout(function(){ nameInput.focus(); }, 60);
+}
+function saveName(){
+  var v = nameInput.value.replace(/\s+/g, " ").trim().slice(0, 18);
+  if (!v){ nameInput.focus(); return; }
+  player = v;
+  writeLS("fivexsix.name", player);
+  showWho();
+  nameVeil.classList.remove("on");
+}
+document.getElementById("nameSave").addEventListener("click", saveName);
+nameInput.addEventListener("keydown", function(e){
+  if (e.key === "Enter"){ e.preventDefault(); saveName(); }
+  e.stopPropagation();
+});
+document.getElementById("whoBtn").addEventListener("click", askName);
+
 /* ---------------- lifecycle ---------------- */
 function resetBoard(){
   tiles.forEach(function(t){
@@ -628,6 +759,7 @@ function startGame(which){
   answer = (mode === "daily") ? wordForDay(puzzleNo) : WORDS[Math.floor(Math.random() * WORDS.length)];
   row = 0; guess = ""; done = false; busy = false; override = null;
   results = []; plays = [];
+  openedAt = new Date(); firstKeyAt = null;
   resetBoard();
   veil.classList.remove("on");
   noticeEl.classList.remove("on");
