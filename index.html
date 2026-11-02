@@ -178,6 +178,16 @@
     transform:translateY(10px);transition:transform .22s ease;
   }
   .veil.on .card{transform:none}
+  #veil .card{position:relative}
+  .close{
+    position:absolute;top:6px;right:6px;width:40px;height:40px;
+    border:0;background:none;cursor:pointer;border-radius:50%;
+    font-size:26px;line-height:1;color:var(--ink-soft);font-family:inherit;
+  }
+  .close:hover{background:rgba(23,32,46,.06);color:var(--ink)}
+  .resultsBar{display:flex;justify-content:center;padding:4px 0 8px}
+  .resultsBar[hidden]{display:none}
+  .resultsBar .btn{flex:0 0 auto;padding:11px 22px}
   .field{
     width:100%;padding:13px 14px;margin:0 0 16px;
     border:2px solid var(--line);border-radius:5px;background:#fff;
@@ -246,8 +256,12 @@
   <div id="board"></div>
 </main>
 
+<div class="resultsBar" id="resultsBar" hidden>
+  <button type="button" class="btn" id="resultsBtn">See results</button>
+</div>
+
 <div id="keyboard"></div>
-<div class="build" id="build">v1.6</div>
+<div class="build" id="build">v1.7</div>
 
 <div class="veil" id="nameVeil">
   <div class="card" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
@@ -256,12 +270,13 @@
     <input id="nameInput" class="field" maxlength="18" autocomplete="given-name"
            autocapitalize="words" spellcheck="false" placeholder="First name">
     <div class="btns"><button class="btn" id="nameSave">Start playing</button></div>
-    <div class="build" style="margin-top:12px">v1.6</div>
+    <div class="build" style="margin-top:12px">v1.7</div>
   </div>
 </div>
 
 <div class="veil" id="veil">
   <div class="card" role="dialog" aria-modal="true" aria-labelledby="endTitle">
+    <button type="button" class="close" id="closeBtn" aria-label="Close and view board">×</button>
     <h2 id="endTitle">Solved</h2>
     <p id="endLine">The word was <span class="answer" id="endWord"></span></p>
     <div class="proof" id="proof"></div>
@@ -284,7 +299,7 @@
    Leave it as "" and the game still works, it just won't log anything.
    ===================================================================== */
 var SHEET_URL = "https://script.google.com/macros/s/AKfycby9LSgWuF5kI_YvwVREjeelv-cYarIznzGh5NTJ1j3vw-Ux4JnZE-ajRD5nnvgISqC-Aw/exec";
-var APP_VERSION = "1.6";
+var APP_VERSION = "1.7";
 
 
 /* ---------------- words ---------------- */
@@ -407,7 +422,7 @@ LAYOUT.forEach(function(keys){
     b.textContent = k === "enter" ? "Enter" : k === "back" ? "Delete" : k;
     if (k === "back") b.setAttribute("aria-label", "Delete letter");
     b.addEventListener("click", function(){
-      if (k === "enter") submit();
+      if (k === "enter"){ if (done && !busy) showCard(); else submit(); }
       else if (k === "back") backspace();
       else typeLetter(k);
       b.blur();
@@ -602,6 +617,21 @@ function startCountdown(){
   tick = setInterval(draw, 1000);
 }
 
+function hideCard(){
+  veil.classList.remove("on");
+  clearInterval(tick);
+  document.getElementById("resultsBar").hidden = !done;
+}
+function showCard(){
+  document.getElementById("resultsBar").hidden = true;
+  startCountdown();
+  veil.classList.add("on");
+  document.getElementById("againBtn").focus();
+}
+document.getElementById("closeBtn").addEventListener("click", hideCard);
+document.getElementById("resultsBtn").addEventListener("click", showCard);
+veil.addEventListener("click", function(e){ if (e.target === veil) hideCard(); });
+
 var pendingEnd = null;
 function endGame(solved){
   if (nameVeil.classList.contains("on")){ pendingEnd = solved; return; }
@@ -627,9 +657,7 @@ function endGame(solved){
 
   document.getElementById("againBtn").textContent = (mode === "daily") ? "Random word" : "Another random";
   document.getElementById("dailyBtn").hidden = (mode === "daily");
-  startCountdown();
-  veil.classList.add("on");
-  document.getElementById("againBtn").focus();
+  showCard();
 }
 
 document.getElementById("copyBtn").addEventListener("click", function(){
@@ -767,6 +795,7 @@ function startGame(which){
   openedAt = new Date(); firstKeyAt = null;
   resetBoard();
   veil.classList.remove("on");
+  document.getElementById("resultsBar").hidden = true;
   noticeEl.classList.remove("on");
   clearInterval(tick);
   updateStats();
@@ -790,9 +819,10 @@ document.addEventListener("keydown", function(e){
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (nameVeil.classList.contains("on")) return;   /* name first */
   if (veil.classList.contains("on")){
-    if (e.key === "Escape"){ veil.classList.remove("on"); clearInterval(tick); }
+    if (e.key === "Escape") hideCard();
     return;
   }
+  if (done && e.key === "Enter"){ e.preventDefault(); showCard(); return; }
   if (e.key === "Enter"){ e.preventDefault(); submit(); }
   else if (e.key === "Backspace"){ e.preventDefault(); backspace(); }
   else if (/^[a-zA-Z]$/.test(e.key)) typeLetter(e.key.toLowerCase());
